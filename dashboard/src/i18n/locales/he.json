@@ -61,7 +61,8 @@
     "messageTester": "בדיקת הודעות",
     "infrastructure": "תשתית",
     "plugins": "תוספים",
-    "logs": "לוגים"
+    "logs": "לוגים",
+    "apiDocs": "תיעוד API"
   },
   "errorBoundary": {
     "title": "משהו השתבש",

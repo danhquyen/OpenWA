@@ -19,6 +19,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Languages,
+  BookOpen,
 } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
 import { type UserRole } from '../hooks/useRole';
@@ -39,6 +40,7 @@ const allNavItems = [
   { to: '/infrastructure', icon: Server, key: 'infrastructure' as const, adminOnly: false },
   { to: '/plugins', icon: Puzzle, key: 'plugins' as const, adminOnly: true },
   { to: '/logs', icon: FileText, key: 'logs' as const, adminOnly: false },
+  { to: '/docs', icon: BookOpen, key: 'apiDocs' as const, adminOnly: false },
 ];
 
 const themeIcons = { light: Sun, dark: Moon, system: Monitor };

@@ -61,7 +61,8 @@
     "messageTester": "Message Tester",
     "infrastructure": "Infrastructure",
     "plugins": "Plugins",
-    "logs": "Logs"
+    "logs": "Logs",
+    "apiDocs": "API Docs"
   },
   "errorBoundary": {
     "title": "Something went wrong",
@@ -507,6 +508,82 @@
       "savedTitle": "Configuration Saved",
       "savedDesc": "Server restart required to apply changes.",
       "saveFailed": "Save Failed"
+    }
+  },
+  "apiDocs": {
+    "title": "API Docs",
+    "subtitle": "Integrate your systems with OpenWA over HTTP",
+    "openSwagger": "Open Swagger",
+    "baseUrl": "Base URL",
+    "baseUrlHint": "The address other systems use to reach this server. Examples below update as you type.",
+    "session": "Session",
+    "noSessions": "No sessions yet",
+    "sessionIdLabel": "Session ID:",
+    "contents": "Contents",
+    "copy": "Copy",
+    "copied": "Copied",
+    "sections": {
+      "quickstart": {
+        "title": "Quick start",
+        "step1": "Create and connect a session on the Sessions page (scan the QR code with the WhatsApp phone).",
+        "step2": "Create a dedicated API key for your system on the API Keys page, with the operator role.",
+        "step3": "Copy the session ID shown above. Every message endpoint is scoped to a session.",
+        "step4": "Call the API with the key in the X-API-Key header:"
+      },
+      "auth": {
+        "title": "Authentication",
+        "intro": "Every request to /api must carry an API key, in either of these headers:",
+        "role": "Role",
+        "access": "Access",
+        "admin": "Everything, including API key, plugin and infrastructure management.",
+        "operator": "Send messages, manage sessions and webhooks. Use this for integrations.",
+        "viewer": "Read-only access (sessions, messages, stats).",
+        "tip": "Use one key per calling system so it can be revoked on its own. Keep keys on the server side and never ship them in browser or mobile app code."
+      },
+      "ids": {
+        "title": "Session and chat IDs",
+        "session": "The UUID of the WhatsApp session (pick it above or copy it from the Sessions page). The session must be in the ready state.",
+        "personal": "A person: country code + phone number, no '+', spaces or leading 0, followed by @c.us. 0901 234 567 in Vietnam becomes 84901234567@c.us.",
+        "group": "A group: the group ID followed by @g.us. List them with GET /api/sessions/{sessionId}/groups.",
+        "phoneTip": "The recipient must have a WhatsApp account. Sending to a number without WhatsApp fails."
+      },
+      "send": {
+        "title": "Sending messages",
+        "intro": "All message endpoints are relative to",
+        "method": "Method",
+        "path": "Path",
+        "body": "JSON body",
+        "media": "Media messages",
+        "mediaIntro": "Pass either a public url that the server can download, or the file as base64 together with its mimetype."
+      },
+      "responses": {
+        "title": "Responses and errors",
+        "intro": "Successful responses wrap the result in data. Errors use the same envelope with success: false and an error object.",
+        "e400": "Invalid body, or the session is not started / not ready.",
+        "e401": "Missing, invalid or expired API key.",
+        "e403": "The key's role is not allowed to call this endpoint (for example a viewer sending messages).",
+        "e404": "Session, message or resource not found.",
+        "e429": "Rate limit exceeded. Wait and retry with backoff.",
+        "e500": "Unexpected server error. Check the Logs page; the message may or may not have been sent."
+      },
+      "webhooks": {
+        "title": "Receiving messages (webhooks)",
+        "intro": "To receive incoming WhatsApp messages, register an HTTPS endpoint of your system as a webhook for the session (or use the Webhooks page):",
+        "events": "Currently the server delivers the message.received event. Other event names are accepted when registering but are not emitted yet.",
+        "payload": "Webhook request",
+        "verify": "Verifying the signature",
+        "verifyIntro": "When a secret is set, X-OpenWA-Signature is an HMAC-SHA256 of the raw request body. Verify it before trusting the payload:",
+        "ruleFast": "Reply with a 2xx status quickly and do heavy work asynchronously; slow or failing responses are retried.",
+        "ruleRetry": "Failed deliveries are retried up to retryCount times, so the same event can arrive more than once.",
+        "ruleIdempotent": "Use idempotencyKey to detect and skip duplicates."
+      },
+      "limits": {
+        "title": "Limits and good practice",
+        "rate": "Rate limit per client IP: 10 requests/second, 100/minute and 1000/hour (configurable with RATE_LIMIT_* variables).",
+        "bulk": "For many recipients, use send-bulk instead of a tight loop: it queues messages with a delay between them, which lowers the risk of WhatsApp banning the number.",
+        "session": "Only message people who expect it. Unsolicited bulk messaging gets numbers banned by WhatsApp.",
+        "network": "In Docker the ports are bound to 127.0.0.1. To let systems on other servers call the API, put a reverse proxy (Nginx, Caddy, Cloudflare Tunnel...) with HTTPS in front of the dashboard port and use that address as the Base URL."
+      }
     }
   }
 }
