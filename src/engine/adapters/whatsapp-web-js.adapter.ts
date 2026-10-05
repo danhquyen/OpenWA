@@ -1,5 +1,5 @@
 import { EventEmitter } from 'events';
-import { Client, LocalAuth, MessageMedia } from 'whatsapp-web.js';
+import { Client, LocalAuth, Message, MessageMedia } from 'whatsapp-web.js';
 import * as qrcode from 'qrcode';
 import * as path from 'path';
 import {
@@ -269,13 +269,40 @@ export class WhatsAppWebJsAdapter extends EventEmitter implements IWhatsAppEngin
     return this.pushName;
   }
 
+  /**
+   * whatsapp-web.js can resolve sendMessage() with undefined even though the message was sent
+   * (e.g. the chat is addressed by LID), so fall back to the latest outgoing message in the chat.
+   */
+  private async toMessageResult(chatId: string, msg: Message | undefined): Promise<MessageResult> {
+    if (msg) {
+      return { id: msg.id._serialized, timestamp: msg.timestamp };
+    }
+
+    // Read the newest outgoing message straight from the chat's model collection (avoids getMessageModel)
+    const latest = (await this.client!.pupPage?.evaluate(
+      `(async () => {
+      const chat = await window.WWebJS.getChat(${JSON.stringify(chatId)}, { getAsModel: false });
+      const msgs = chat ? chat.msgs.getModelsArray() : [];
+      const msg = msgs.filter(m => m.id.fromMe).sort((a, b) => a.t - b.t).pop();
+      return msg ? { id: msg.id._serialized || msg.id.toString(), timestamp: msg.t } : { error: 'no outgoing message', chatFound: !!chat, count: msgs.length };
+    })()`,
+    ).catch((error: unknown) => ({ error: String(error) }))) as
+      | (Partial<MessageResult> & { error?: string })
+      | undefined;
+
+    if (!latest?.id) {
+      this.logger.warn('Message sent but its id could not be resolved', { chatId, details: latest });
+    }
+    return {
+      id: latest?.id ?? '',
+      timestamp: latest?.timestamp ?? Math.floor(Date.now() / 1000),
+    };
+  }
+
   async sendTextMessage(chatId: string, text: string): Promise<MessageResult> {
     this.ensureReady();
     const msg = await this.client!.sendMessage(chatId, text);
-    return {
-      id: msg.id._serialized,
-      timestamp: msg.timestamp,
-    };
+    return this.toMessageResult(chatId, msg);
   }
 
   async sendImageMessage(chatId: string, media: MediaInput): Promise<MessageResult> {
@@ -316,10 +343,7 @@ export class WhatsAppWebJsAdapter extends EventEmitter implements IWhatsAppEngin
       caption: media.caption,
     });
 
-    return {
-      id: msg.id._serialized,
-      timestamp: msg.timestamp,
-    };
+    return this.toMessageResult(chatId, msg);
   }
 
   async getContacts(): Promise<Contact[]> {
@@ -391,10 +415,7 @@ export class WhatsAppWebJsAdapter extends EventEmitter implements IWhatsAppEngin
       address: location.address || '',
     });
     const msg = await this.client!.sendMessage(chatId, loc);
-    return {
-      id: msg.id._serialized,
-      timestamp: msg.timestamp,
-    };
+    return this.toMessageResult(chatId, msg);
   }
 
   async sendContactMessage(chatId: string, contact: ContactCard): Promise<MessageResult> {
@@ -411,10 +432,7 @@ export class WhatsAppWebJsAdapter extends EventEmitter implements IWhatsAppEngin
     const msg = await this.client!.sendMessage(chatId, vcard, {
       parseVCards: true,
     });
-    return {
-      id: msg.id._serialized,
-      timestamp: msg.timestamp,
-    };
+    return this.toMessageResult(chatId, msg);
   }
 
   async sendStickerMessage(chatId: string, media: MediaInput): Promise<MessageResult> {
@@ -434,10 +452,7 @@ export class WhatsAppWebJsAdapter extends EventEmitter implements IWhatsAppEngin
     const msg = await this.client!.sendMessage(chatId, messageMedia, {
       sendMediaAsSticker: true,
     });
-    return {
-      id: msg.id._serialized,
-      timestamp: msg.timestamp,
-    };
+    return this.toMessageResult(chatId, msg);
   }
 
   async replyToMessage(chatId: string, quotedMsgId: string, text: string): Promise<MessageResult> {
@@ -452,10 +467,7 @@ export class WhatsAppWebJsAdapter extends EventEmitter implements IWhatsAppEngin
     }
 
     const msg = await quotedMsg.reply(text);
-    return {
-      id: msg.id._serialized,
-      timestamp: msg.timestamp,
-    };
+    return this.toMessageResult(chatId, msg);
   }
 
   async forwardMessage(fromChatId: string, toChatId: string, messageId: string): Promise<MessageResult> {
