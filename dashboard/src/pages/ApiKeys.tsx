@@ -13,6 +13,7 @@ import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { useApiKeysQuery, useCreateApiKeyMutation, useDeleteApiKeyMutation, useRevokeApiKeyMutation } from '../hooks/queries';
 import { PageHeader } from '../components/PageHeader';
 import './ApiKeys.css';
+import { copyText } from '../utils/clipboard';
 
 const roleNames = ['admin', 'operator', 'viewer'] as const;
 
@@ -97,9 +98,11 @@ export function ApiKeys() {
   };
 
   const copyToClipboard = (text: string, id: string) => {
-    navigator.clipboard.writeText(text);
-    setCopied(id);
-    setTimeout(() => setCopied(null), 2000);
+    void copyText(text).then(ok => {
+      if (!ok) return;
+      setCopied(id);
+      setTimeout(() => setCopied(null), 2000);
+    });
   };
 
   const columns = useMemo(

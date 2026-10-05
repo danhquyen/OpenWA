@@ -4,6 +4,7 @@ import { Check, Copy, ExternalLink } from 'lucide-react';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { useSessionsQuery } from '../hooks/queries';
 import { PageHeader } from '../components/PageHeader';
+import { copyText } from '../utils/clipboard';
 import './ApiDocs.css';
 
 const BASE_URL_STORAGE_KEY = 'openwa_docs_base_url';
@@ -24,7 +25,8 @@ function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
 
   const copy = () => {
-    void navigator.clipboard.writeText(text).then(() => {
+    void copyText(text).then(ok => {
+      if (!ok) return;
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     });

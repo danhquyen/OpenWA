@@ -36,6 +36,9 @@ interface ToastProviderProps {
   children: ReactNode;
 }
 
+// Monotonic id source; crypto.randomUUID() is unavailable over plain HTTP
+let toastSeq = 0;
+
 export function ToastProvider({ children }: ToastProviderProps) {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
@@ -45,7 +48,7 @@ export function ToastProvider({ children }: ToastProviderProps) {
 
   const addToast = useCallback(
     (toast: Omit<Toast, 'id'>) => {
-      const id = crypto.randomUUID();
+      const id = `toast-${++toastSeq}`;
       const newToast = { ...toast, id };
       setToasts(prev => [...prev, newToast]);
 
