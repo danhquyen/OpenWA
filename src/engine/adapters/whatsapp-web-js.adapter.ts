@@ -1,6 +1,8 @@
 import { EventEmitter } from 'events';
 import { Client, LocalAuth, Message, MessageMedia } from 'whatsapp-web.js';
 import * as qrcode from 'qrcode';
+import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
 import {
   IWhatsAppEngine,
@@ -88,10 +90,14 @@ export class WhatsAppWebJsAdapter extends EventEmitter implements IWhatsAppEngin
         );
       }
 
+      const dataPath = path.resolve(this.config.sessionDataPath);
+      // LocalAuth stores the Chromium profile in <dataPath>/session-<clientId>
+      this.removeStaleProfileLock(path.join(dataPath, `session-${this.config.sessionId}`));
+
       this.client = new Client({
         authStrategy: new LocalAuth({
           clientId: this.config.sessionId,
-          dataPath: path.resolve(this.config.sessionDataPath),
+          dataPath,
         }),
         puppeteer: {
           headless: this.config.puppeteer?.headless ?? true,
@@ -267,6 +273,42 @@ export class WhatsAppWebJsAdapter extends EventEmitter implements IWhatsAppEngin
 
   getPushName(): string | null {
     return this.pushName;
+  }
+
+  /**
+   * Chromium locks its profile with SingletonLock -> "<hostname>-<pid>". When the container is recreated
+   * (new hostname) or Chromium crashed, that stale lock makes the next launch fail with
+   * "The profile appears to be in use by another Chromium process". Remove it unless the owner is still alive.
+   */
+  private removeStaleProfileLock(userDataDir: string): void {
+    let owner: string;
+    try {
+      owner = fs.readlinkSync(path.join(userDataDir, 'SingletonLock'));
+    } catch {
+      return; // No lock
+    }
+
+    const separator = owner.lastIndexOf('-');
+    const host = owner.slice(0, separator);
+    const pid = Number(owner.slice(separator + 1));
+    if (host === os.hostname() && this.isProcessAlive(pid)) {
+      return;
+    }
+
+    for (const name of ['SingletonLock', 'SingletonSocket', 'SingletonCookie']) {
+      fs.rmSync(path.join(userDataDir, name), { force: true });
+    }
+    this.logger.warn(`Removed stale Chromium profile lock (owner: ${owner})`, { sessionId: this.config.sessionId });
+  }
+
+  private isProcessAlive(pid: number): boolean {
+    if (!Number.isInteger(pid) || pid <= 0) return false;
+    try {
+      process.kill(pid, 0);
+      return true;
+    } catch (error) {
+      return (error as NodeJS.ErrnoException).code === 'EPERM';
+    }
   }
 
   /**
