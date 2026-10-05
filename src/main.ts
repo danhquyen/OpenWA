@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { ShutdownService } from './common/services/shutdown.service';
@@ -65,7 +66,12 @@ STORAGE_PATH=./data/media
 }
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+  // Media can be sent as base64 in the JSON body; Express defaults to 100kb
+  const bodyLimit = process.env.BODY_LIMIT || '50mb';
+  app.useBodyParser('json', { limit: bodyLimit });
+  app.useBodyParser('urlencoded', { limit: bodyLimit, extended: true });
 
   // Enable shutdown hooks for graceful shutdown
   app.enableShutdownHooks();
@@ -136,7 +142,8 @@ async function bootstrap() {
       transformOptions: {
         enableImplicitConversion: true,
       },
-      disableErrorMessages: process.env.NODE_ENV === 'production', // Hide details in prod
+      // Validation messages only name DTO fields (already public in Swagger); set HIDE_VALIDATION_ERRORS=true to hide them
+      disableErrorMessages: process.env.HIDE_VALIDATION_ERRORS === 'true',
     }),
   );
 

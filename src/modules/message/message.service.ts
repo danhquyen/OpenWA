@@ -479,13 +479,22 @@ export class MessageService {
       throw new BadRequestException('Either url or base64 must be provided');
     }
 
-    if (dto.base64 && !dto.mimetype) {
+    // Accept data URIs ("data:image/png;base64,....") and take the mimetype from them
+    let base64 = dto.base64;
+    let mimetype = dto.mimetype;
+    const dataUri = base64?.match(/^data:([^;,]+);base64,/);
+    if (base64 && dataUri) {
+      mimetype = mimetype || dataUri[1];
+      base64 = base64.slice(dataUri[0].length);
+    }
+
+    if (base64 && !mimetype) {
       throw new BadRequestException('mimetype is required when using base64 data');
     }
 
     return {
-      mimetype: dto.mimetype || 'application/octet-stream',
-      data: dto.url || dto.base64!,
+      mimetype: mimetype || 'application/octet-stream',
+      data: dto.url || base64!,
       filename: dto.filename,
       caption: dto.caption,
     };

@@ -133,6 +133,7 @@ export class WhatsAppWebJsAdapter extends EventEmitter implements IWhatsAppEngin
     });
 
     this.client.on('ready', () => {
+      void this.patchMediaSending();
       try {
         const info = this.client?.info;
         this.phoneNumber = info?.wid?.user || null;
@@ -273,6 +274,37 @@ export class WhatsAppWebJsAdapter extends EventEmitter implements IWhatsAppEngin
 
   getPushName(): string | null {
     return this.pushName;
+  }
+
+  /**
+   * Media sends fail on recent WhatsApp Web builds with "Data passed to getter must include an id property":
+   * processMediaData() returns a MediaData model whose enumerable __x_id gets spread into the outgoing message
+   * and overwrites its key. Fixed upstream (wwebjs/whatsapp-web.js#201923, not in an npm release yet) by dropping
+   * __x_id; do the same by making it non-enumerable on every MediaData returned. Re-applied on each 'ready'
+   * because the injected helpers are recreated when the page reloads.
+   */
+  private async patchMediaSending(): Promise<void> {
+    try {
+      await this.client?.pupPage?.evaluate(`(() => {
+        const wwebjs = window.WWebJS;
+        if (!wwebjs || !wwebjs.processMediaData || wwebjs.__openwaMediaPatched) return;
+        const original = wwebjs.processMediaData;
+        wwebjs.processMediaData = async (...args) => {
+          const media = await original(...args);
+          if (media && Object.prototype.propertyIsEnumerable.call(media, '__x_id')) {
+            try {
+              Object.defineProperty(media, '__x_id', { enumerable: false });
+            } catch (e) {
+              delete media.__x_id;
+            }
+          }
+          return media;
+        };
+        wwebjs.__openwaMediaPatched = true;
+      })()`);
+    } catch (error) {
+      this.logger.warn('Could not apply media sending patch', { error: String(error) });
+    }
   }
 
   /**

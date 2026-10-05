@@ -35,7 +35,7 @@ export class SendMediaMessageDto {
     example: 'https://example.com/image.jpg',
   })
   @IsOptional()
-  @IsUrl()
+  @IsUrl({ require_protocol: true, protocols: ['http', 'https'] }, { message: 'url must be a full http(s) URL' })
   @ValidateIf((o: SendMediaMessageDto) => !o.base64)
   url?: string;
 
