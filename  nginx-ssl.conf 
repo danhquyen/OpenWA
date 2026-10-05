@@ -1,0 +1,25 @@
+# ===== thuho.stdmcl.com -> stack thu ho (host:8085) =====
+server {
+    listen 80;
+    server_name thuho.stdmcl.com;
+    return 301 https://$host$request_uri;
+}
+server {
+    listen 443 ssl;
+    server_name thuho.stdmcl.com;
+
+    ssl_certificate     /etc/nginx/ssl/stdmcl.com.crt;
+    ssl_certificate_key /etc/nginx/ssl/stdmcl.com.key;
+
+    client_max_body_size 80m;
+
+    location / {
+        proxy_pass http://172.17.0.1:8085;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_read_timeout 180s;
+    }
+}
