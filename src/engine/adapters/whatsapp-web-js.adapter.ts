@@ -428,22 +428,37 @@ export class WhatsAppWebJsAdapter extends EventEmitter implements IWhatsAppEngin
 
   async getGroups(): Promise<Group[]> {
     this.ensureReady();
-    const chats = await this.client!.getChats();
+    // client.getChats() serializes every chat with Promise.all and refreshes group metadata over the network,
+    // so a single problematic chat (LID, channel, metadata fetch) fails the whole call. Read the group chats
+    // straight from the in-page collection instead, skipping any chat that cannot be read.
+    const me = this.client!.info?.wid?._serialized ?? '';
+    const groups = (await this.client!.pupPage!.evaluate(`(() => {
+      const me = ${JSON.stringify(me)};
+      const result = [];
+      for (const chat of window.require('WAWebCollections').Chat.getModelsArray()) {
+        try {
+          const id = chat.id._serialized || chat.id.toString();
+          if (!id.endsWith('@g.us')) continue;
+          const participants = chat.groupMetadata?.participants;
+          const list = participants?.getModelsArray ? participants.getModelsArray() : [];
+          const isAdmin =
+            typeof participants?.iAmAdmin === 'function'
+              ? participants.iAmAdmin()
+              : list.some(p => p.isAdmin && (p.id._serialized || p.id.toString()) === me);
+          result.push({
+            id,
+            name: chat.formattedTitle || chat.name || chat.groupMetadata?.subject || id,
+            participantsCount: list.length || undefined,
+            isAdmin: !!isAdmin,
+          });
+        } catch (e) {
+          // Skip chats that cannot be read
+        }
+      }
+      return result;
+    })()`)) as Group[];
 
-    // Filter only group chats
-    const groups = chats.filter(chat => chat.isGroup);
-
-    return groups.map(g => {
-      const groupChat = g as unknown as GroupChat;
-      return {
-        id: g.id._serialized,
-        name: g.name,
-        participantsCount: groupChat.participants?.length,
-        isAdmin: groupChat.participants?.some(
-          p => p.isAdmin && p.id._serialized === this.client?.info?.wid?._serialized,
-        ),
-      };
-    });
+    return groups;
   }
 
   // ============= Phase 3: Extended Messaging =============

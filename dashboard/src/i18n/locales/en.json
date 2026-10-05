@@ -542,7 +542,7 @@
       },
       "ids": {
         "title": "Session and chat IDs",
-        "session": "The UUID of the WhatsApp session (pick it above or copy it from the Sessions page). The session must be in the ready state.",
+        "session": "The UUID of the WhatsApp session (pick it above or copy it from the Sessions page). The session must be in the ready state. Deleting and recreating a session gives it a new UUID.",
         "personal": "A person: country code + phone number, no '+', spaces or leading 0, followed by @c.us. 0901 234 567 in Vietnam becomes 84901234567@c.us.",
         "group": "A group: the group ID followed by @g.us. List them with GET /api/sessions/{sessionId}/groups.",
         "phoneTip": "The recipient must have a WhatsApp account. Sending to a number without WhatsApp fails."
@@ -558,8 +558,8 @@
       },
       "responses": {
         "title": "Responses and errors",
-        "intro": "Successful responses wrap the result in data. Errors use the same envelope with success: false and an error object.",
-        "e400": "Invalid body, or the session is not started / not ready.",
+        "intro": "Successful calls return the result object directly (HTTP 200/201). Errors use the HTTP status code with a JSON body containing statusCode and message; always check the status code first.",
+        "e400": "Bad body or session not usable. A bare \"Bad Request\" means the JSON body failed validation: only the documented fields are accepted (unknown fields such as phone or message are rejected), and Content-Type must be application/json.",
         "e401": "Missing, invalid or expired API key.",
         "e403": "The key's role is not allowed to call this endpoint (for example a viewer sending messages).",
         "e404": "Session, message or resource not found.",

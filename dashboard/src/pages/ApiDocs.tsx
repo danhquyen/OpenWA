@@ -86,8 +86,8 @@ const res = await fetch('${base}/api/sessions/${sid}/messages/send-text', {
 });
 
 const json = await res.json();
-if (!json.success) throw new Error(json.error.message);
-console.log(json.data.messageId);`,
+if (!res.ok) throw new Error(\`\${res.status}: \${json.message}\`);
+console.log(json.messageId);`,
   Python: `import os
 import requests
 
@@ -98,9 +98,9 @@ res = requests.post(
     timeout=30,
 )
 body = res.json()
-if not body["success"]:
-    raise RuntimeError(body["error"]["message"])
-print(body["data"]["messageId"])`,
+if not res.ok:
+    raise RuntimeError(f"{res.status}: {body.get('message')}")
+print(body["messageId"])`,
   PHP: `<?php
 $ch = curl_init('${base}/api/sessions/${sid}/messages/send-text');
 curl_setopt_array($ch, [
@@ -116,12 +116,13 @@ curl_setopt_array($ch, [
     ]),
 ]);
 $body = json_decode(curl_exec($ch), true);
+$status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
 curl_close($ch);
 
-if (!$body['success']) {
-    throw new Exception($body['error']['message']);
+if ($status >= 400) {
+    throw new Exception($status . ': ' . json_encode($body['message'] ?? $body));
 }
-echo $body['data']['messageId'];`,
+echo $body['messageId'];`,
 });
 
 const sendMediaSnippets = (base: string, sid: string): Snippets => ({
@@ -146,28 +147,20 @@ const sendMediaSnippets = (base: string, sid: string): Snippets => ({
 });
 
 const responseSnippets = (): Snippets => ({
-  '200 OK': `{
-  "success": true,
-  "data": {
-    "messageId": "true_84901234567@c.us_3EB0C0A1B2C3D4E5F6",
-    "timestamp": 1791212993
-  },
-  "meta": {
-    "timestamp": "2026-10-05T15:06:50.000Z",
-    "requestId": "8f0c2c1e-..."
-  }
+  '201 Created': `{
+  "messageId": "true_84901234567@c.us_3EB0C0A1B2C3D4E5F6",
+  "timestamp": 1791212993
 }`,
-  Error: `{
-  "success": false,
-  "error": {
-    "code": "BAD_REQUEST",
-    "message": "Session 'xxx' is not active. Start the session first.",
-    "details": null
-  },
-  "meta": {
-    "timestamp": "2026-10-05T15:06:50.000Z",
-    "requestId": "8f0c2c1e-..."
-  }
+  '400 Session': `{
+  "statusCode": 400,
+  "message": "Session 'xxx' is not active. Start the session first.",
+  "error": "Bad Request"
+}`,
+  '400 Body': `// Invalid JSON body (missing/unknown fields). With NODE_ENV=production
+// the details are hidden and only this is returned:
+{
+  "statusCode": 400,
+  "message": "Bad Request"
 }`,
 });
 
